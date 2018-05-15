@@ -2,8 +2,12 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"log"
+	"net/http"
 	"time"
+
+	"github.com/brumawen/gopi-finder/src"
 
 	gopitools "github.com/brumawen/gopi-tools/src"
 )
@@ -16,10 +20,11 @@ type SoilMonitor struct {
 	VerboseLogging bool
 }
 
+// Run is called from the scheduler (ClockWerk). This function will get the latest measurements
+// and send the measurements to Thingspeak
+// It will also keep the last hour's worth of measurements in a list.
 func (m *SoilMonitor) Run() {
 	// Get the current device information
-	
-
 	v, err := m.MeasureValues()
 	if err != nil {
 		m.Measurements = append(m.Measurements, Measurement{
@@ -28,6 +33,12 @@ func (m *SoilMonitor) Run() {
 			DateMeasured: time.Now(),
 		})
 	} else {
+		// Send the measurement to Thingspeak
+		err = m.sendToThingspeak(v)
+		if err != nil {
+			v.Error = err.Error()
+		}
+		// Append the measurement to the list
 		m.Measurements = append(m.Measurements, v)
 	}
 	// Only keep the last 10 measurements
@@ -37,6 +48,7 @@ func (m *SoilMonitor) Run() {
 	}
 }
 
+// MeasureValues will measure the values from the component probes.
 func (m *SoilMonitor) MeasureValues() (Measurement, error) {
 	if m.VerboseLogging {
 		log.Println("Measuring values.")
@@ -73,7 +85,7 @@ func (m *SoilMonitor) MeasureValues() (Measurement, error) {
 		return v, errors.New("Error getting temperature device list." + err.Error())
 	}
 	if len(devlst) == 0 {
-		return v, errors.New("No temperature device found.")
+		return v, errors.New("No temperature device found")
 	}
 	if m.VerboseLogging {
 		log.Println("Reading temperature.")
@@ -109,4 +121,19 @@ func (m *SoilMonitor) MeasureValues() (Measurement, error) {
 
 	v.Success = true
 	return v, nil
+}
+
+func (m *SoilMonitor) sendToThingspeak(v Measurement) error {
+	// Get the thingspeak api key
+	key, err := gopifinder.ReadAllText("ts-api-key")
+	if err != nil {
+		return errors.New("Error reading Thingspeak API Key. " + err.Error())
+	}
+	client := http.Client{}
+	url := fmt.Sprintf("https://api.thingspeak.com/update?api_key=%s&field1=%f&field2=%f&field3=%f", key, v.Temperature, v.Light, v.Moisture)
+	_, err := client.Get(url)
+	if err != nil {
+		return errors.New("Error sending measurements to Thingspeak. " + err.Error())
+	}
+	return nil
 }
