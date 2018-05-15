@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/brumawen/gopi-finder/src"
@@ -18,6 +19,7 @@ type SoilMonitor struct {
 	LastRead       time.Time
 	Measurements   []Measurement
 	VerboseLogging bool
+	IsRunning      bool
 }
 
 // Run is called from the scheduler (ClockWerk). This function will get the latest measurements
@@ -27,6 +29,7 @@ func (m *SoilMonitor) Run() {
 	// Get the current device information
 	v, err := m.MeasureValues()
 	if err != nil {
+		log.Println("Error getting measurements. " + err.Error())
 		m.Measurements = append(m.Measurements, Measurement{
 			Success:      false,
 			Error:        err.Error(),
@@ -36,6 +39,7 @@ func (m *SoilMonitor) Run() {
 		// Send the measurement to Thingspeak
 		err = m.sendToThingspeak(v)
 		if err != nil {
+			log.Println("Error sending result to Thingspeak. " + err.Error())
 			v.Error = err.Error()
 		}
 		// Append the measurement to the list
@@ -50,6 +54,16 @@ func (m *SoilMonitor) Run() {
 
 // MeasureValues will measure the values from the component probes.
 func (m *SoilMonitor) MeasureValues() (Measurement, error) {
+	if m.IsRunning {
+		if len(m.Measurements) == 0 {
+			return Measurement{}, nil
+		} else {
+			return m.Measurements[len(m.Measurements)-1], nil
+		}
+	}
+	m.IsRunning = true
+	defer m.setStopped()
+
 	if m.VerboseLogging {
 		log.Println("Measuring values.")
 	}
@@ -123,17 +137,29 @@ func (m *SoilMonitor) MeasureValues() (Measurement, error) {
 	return v, nil
 }
 
+func (m *SoilMonitor) setStopped() {
+	m.IsRunning = false
+}
+
 func (m *SoilMonitor) sendToThingspeak(v Measurement) error {
+	if _, err := os.Stat("ts-api-key"); os.IsNotExist(err) {
+		// Thingspeak API key file is missing
+		return errors.New("API key file 'ts-api-key' is missing")
+	}
+
 	// Get the thingspeak api key
 	key, err := gopifinder.ReadAllText("ts-api-key")
 	if err != nil {
-		return errors.New("Error reading Thingspeak API Key. " + err.Error())
+		return errors.New("Error reading API Key from 'ts-api-key' file. " + err.Error())
+	}
+	if m.VerboseLogging {
+		log.Println("Sending measurements to Thingspeak")
 	}
 	client := http.Client{}
 	url := fmt.Sprintf("https://api.thingspeak.com/update?api_key=%s&field1=%f&field2=%f&field3=%f", key, v.Temperature, v.Light, v.Moisture)
-	_, err := client.Get(url)
+	_, err = client.Get(url)
 	if err != nil {
-		return errors.New("Error sending measurements to Thingspeak. " + err.Error())
+		return err
 	}
 	return nil
 }

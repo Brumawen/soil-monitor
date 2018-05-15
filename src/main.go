@@ -44,12 +44,12 @@ func main() {
 	// Run the monitor code to extract the values immedietely
 	go s.Monitor.Run()
 
-	// Start the scheduler
+	// Start the scheduler to run the monitor code periodically.
 	cw := clockwerk.New()
 	cw.Every(time.Duration(*mins) * time.Minute).Do(&s.Monitor)
 	cw.Start()
 
-	// Start the server
+	// Start the web server
 	err := s.ListenAndServe()
 	if err != nil {
 		log.Println(err)
