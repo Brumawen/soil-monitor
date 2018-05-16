@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+// Measurement holds the values read from the component probes.
 type Measurement struct {
 	Temperature  float64
 	Light        float64

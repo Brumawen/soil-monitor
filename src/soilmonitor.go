@@ -26,7 +26,7 @@ type SoilMonitor struct {
 // and send the measurements to Thingspeak
 // It will also keep the last hour's worth of measurements in a list.
 func (m *SoilMonitor) Run() {
-	// Get the current device information
+	// Get the current measurements
 	v, err := m.MeasureValues()
 	if err != nil {
 		log.Println("Error getting measurements. " + err.Error())
@@ -57,9 +57,8 @@ func (m *SoilMonitor) MeasureValues() (Measurement, error) {
 	if m.IsRunning {
 		if len(m.Measurements) == 0 {
 			return Measurement{}, nil
-		} else {
-			return m.Measurements[len(m.Measurements)-1], nil
 		}
+		return m.Measurements[len(m.Measurements)-1], nil
 	}
 	m.IsRunning = true
 	defer m.setStopped()

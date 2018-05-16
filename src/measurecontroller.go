@@ -3,10 +3,12 @@ package main
 import "github.com/gorilla/mux"
 import "net/http"
 
+// MeasureController handles the Web Methods for measuring the values.
 type MeasureController struct {
 	Srv *Server
 }
 
+// AddController adds the controller routes to the router
 func (c *MeasureController) AddController(router *mux.Router, s *Server) {
 	c.Srv = s
 	router.Methods("GET").Path("/measure/get").Name("GetMeasurements").
