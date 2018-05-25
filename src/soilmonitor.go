@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"time"
@@ -16,20 +15,21 @@ import (
 // SoilMonitor manages the monitoring of the soil measurement components
 // and provides the latest readings.
 type SoilMonitor struct {
-	LastRead       time.Time
-	Measurements   []Measurement
-	VerboseLogging bool
-	IsRunning      bool
+	Srv          *Server
+	LastRead     time.Time
+	Measurements []Measurement
+	IsRunning    bool
 }
 
 // Run is called from the scheduler (ClockWerk). This function will get the latest measurements
 // and send the measurements to Thingspeak
 // It will also keep the last hour's worth of measurements in a list.
 func (m *SoilMonitor) Run() {
+	m.logDebug("Starting run.")
 	// Get the current measurements
 	v, err := m.MeasureValues()
 	if err != nil {
-		log.Println("Error getting measurements. " + err.Error())
+		m.logError("Error getting measurements. ", err.Error())
 		m.Measurements = append(m.Measurements, Measurement{
 			Success:      false,
 			Error:        err.Error(),
@@ -37,9 +37,10 @@ func (m *SoilMonitor) Run() {
 		})
 	} else {
 		// Send the measurement to Thingspeak
+		m.logDebug("Sending result to Thingspeak.")
 		err = m.sendToThingspeak(v)
 		if err != nil {
-			log.Println("Error sending result to Thingspeak. " + err.Error())
+			m.logError("Error sending result to Thingspeak. " + err.Error())
 			v.Error = err.Error()
 		}
 		// Append the measurement to the list
@@ -50,6 +51,7 @@ func (m *SoilMonitor) Run() {
 		// Remove the first item
 		m.Measurements = m.Measurements[1:]
 	}
+	m.logDebug("Completed run.")
 }
 
 // MeasureValues will measure the values from the component probes.
@@ -63,21 +65,18 @@ func (m *SoilMonitor) MeasureValues() (Measurement, error) {
 	m.IsRunning = true
 	defer m.setStopped()
 
-	if m.VerboseLogging {
-		log.Println("Measuring values.")
-	}
+	m.logDebug("Reading measurements.")
 
 	v := Measurement{
 		DateMeasured: time.Now(),
 	}
 
 	// Switch on the power to the soil components
-	if m.VerboseLogging {
-		log.Println("Turning on power.")
-	}
+	m.logDebug("Turning on power.")
 	pwr := gopitools.Pin{GpioNo: 22, TurnOffOnClose: true}
 	defer pwr.Close()
 	if err := pwr.On(); err != nil {
+		m.logError("Error turning on power.", err.Error())
 		return v, errors.New("Error turning on power. " + err.Error())
 	}
 
@@ -90,45 +89,42 @@ func (m *SoilMonitor) MeasureValues() (Measurement, error) {
 	tmp.ID = ""
 
 	// Get the available one-wire devices
-	if m.VerboseLogging {
-		log.Println("Getting one-wire device list.")
-	}
+	m.logDebug("Getting one-wire device list.")
 	devlst, err := gopitools.GetDeviceList()
 	if err != nil {
-		return v, errors.New("Error getting temperature device list." + err.Error())
+		m.logError("Error getting one-wire device list.", err.Error())
+		return v, errors.New("Error getting one-wire device list." + err.Error())
 	}
 	if len(devlst) == 0 {
+		m.logError("No temperature device found.")
 		return v, errors.New("No temperature device found")
 	}
-	if m.VerboseLogging {
-		log.Println("Reading temperature.")
-	}
+	m.logDebug("Reading temperature.")
 	tmp.ID = devlst[0].ID
 	temp, err := tmp.ReadTemp()
 	if err != nil {
+		m.logError("Error reading temperature.", err.Error())
 		return v, errors.New("Error reading temperature. " + err.Error())
 	}
 	v.Temperature = temp
 
 	// Read ambient light and moisture content
-	if m.VerboseLogging {
-		log.Println("Reading Light and Moisture values")
-	}
+	m.logDebug("Reading Light and Moisture values")
 	mcp := gopitools.Mcp3008{}
 	defer mcp.Close()
 	mcpVals, err := mcp.Read()
 	if err != nil {
+		m.logError("Error reading MCP3008 values.", err.Error())
 		return v, errors.New("Error reading MCP3008 values. " + err.Error())
 	}
 	v.Light = 100 - mcpVals[0]
 	v.Moisture = mcpVals[1]
 
 	// Switch off the power to the soil components
-	if m.VerboseLogging {
-		log.Println("Turning off power")
-	}
+	m.logDebug("Turning off power")
 	err = pwr.Off()
 	if err != nil {
+		m.logError("Error turning off power.", err.Error())
 		v.Error = "Error turning off power. " + err.Error()
 	}
 
@@ -151,9 +147,6 @@ func (m *SoilMonitor) sendToThingspeak(v Measurement) error {
 	if err != nil {
 		return errors.New("Error reading API Key from 'ts-api-key' file. " + err.Error())
 	}
-	if m.VerboseLogging {
-		log.Println("Sending measurements to Thingspeak")
-	}
 	client := http.Client{}
 	url := fmt.Sprintf("https://api.thingspeak.com/update?api_key=%s&field1=%f&field2=%f&field3=%f", key, v.Temperature, v.Light, v.Moisture)
 	_, err = client.Get(url)
@@ -161,4 +154,21 @@ func (m *SoilMonitor) sendToThingspeak(v Measurement) error {
 		return err
 	}
 	return nil
+}
+
+func (m *SoilMonitor) logDebug(v ...interface{}) {
+	if m.Srv.VerboseLogging {
+		a := fmt.Sprint(v)
+		logger.Info("Server: ", a[1:len(a)-1])
+	}
+}
+
+func (m *SoilMonitor) logInfo(v ...interface{}) {
+	a := fmt.Sprint(v)
+	logger.Info("Server: ", a[1:len(a)-1])
+}
+
+func (m *SoilMonitor) logError(v ...interface{}) {
+	a := fmt.Sprint(v)
+	logger.Error("Server: ", a[1:len(a)-1])
 }
