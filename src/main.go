@@ -19,14 +19,14 @@ func main() {
 	flag.Parse()
 
 	// Create a new server
-	s := Server{
+	s := &Server{
 		PortNo:    *port,
 		Timeout:   *timeout,
 		SchedTime: *mins,
 	}
 
 	// Create the service
-	svgConfig := &service.Config{
+	svcConfig := &service.Config{
 		Name:        "SoilMonitor",
 		DisplayName: "Soil Monitor",
 		Description: "Monitors soil temperature, humidity and ambient light.",

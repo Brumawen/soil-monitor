@@ -16,9 +16,9 @@ type MeasureController struct {
 func (c *MeasureController) AddController(router *mux.Router, s *Server) {
 	c.Srv = s
 	router.Methods("GET").Path("/measure/get").Name("GetMeasurements").
-		Handler(Logger(http.HandlerFunc(c.handleGetMeasure)))
+		Handler(Logger(c, http.HandlerFunc(c.handleGetMeasure)))
 	router.Methods("GET").Path("/measure/getcurrent").Name("GetCurrent").
-		Handler(Logger(http.HandlerFunc(c.handleGetCurrent)))
+		Handler(Logger(c, http.HandlerFunc(c.handleGetCurrent)))
 }
 
 func (c *MeasureController) handleGetMeasure(w http.ResponseWriter, r *http.Request) {

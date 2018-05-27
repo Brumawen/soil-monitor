@@ -2,30 +2,32 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/brumawen/gopi-finder/src"
 	"github.com/brumawen/gopi-tools/src"
 	"github.com/gorilla/mux"
 	"github.com/kardianos/service"
+	"github.com/onatm/clockwerk"
 )
 
 // Server defines the Web Server.
 type Server struct {
-	PortNo         int                   // Port No the server will listen on
-	VerboseLogging bool                  // Verbose logging on/ off
-	Timeout        int                   // Timeout waiting for a response from an IP probe.  Defaults to 2 seconds.
-	SchedTime 	   int					 // Schedule time (mins)
-	finder         gopifinder.Finder     // Finder client - used to find other devices
-	monitor        *SoilMonitor          // Soil monitor module
-	led            gopitools.Led         // LED module
-	device         gopifinder.DeviceInfo // This server's device
-	exit           chan struct{}         // Exit flag
-	http           *http.Server          // HTTP server
-	router         *mux.Router           // HTTP router
-	cw			   *clockwerk.Clockwerk  // Clockwerk scheduler
+	PortNo         int                  // Port No the server will listen on
+	VerboseLogging bool                 // Verbose logging on/ off
+	Timeout        int                  // Timeout waiting for a response from an IP probe.  Defaults to 2 seconds.
+	SchedTime      int                  // Schedule time (mins)
+	Finder         gopifinder.Finder    // Finder client - used to find other devices
+	Monitor        SoilMonitor          // Soil monitor module
+	LCD            *Display             // LCD display
+	Led            gopitools.Led        // LED module
+	exit           chan struct{}        // Exit flag
+	shutdown       chan struct{}        // Shutdown complete flag
+	http           *http.Server         // HTTP server
+	router         *mux.Router          // HTTP router
+	cw             *clockwerk.Clockwerk // Clockwerk scheduler
 }
 
 // Start is called when the service is starting
@@ -41,7 +43,10 @@ func (s *Server) Start(v service.Service) error {
 func (s *Server) Stop(v service.Service) error {
 	s.logInfo("Service stopping")
 	// Close the channel, this will automatically release the block
+	s.shutdown = make(chan struct{})
 	close(s.exit)
+	// Wait for the shutdown to complete
+	_ = <-s.shutdown
 	return nil
 }
 
@@ -50,7 +55,9 @@ func (s *Server) run() {
 	if s.PortNo < 0 {
 		s.PortNo = 20510
 	}
-	s.logInfo("Server listening on port", s.PortNo)
+	s.Monitor.Srv = s
+	s.Finder.Logger = logger
+	s.Finder.VerboseLogging = service.Interactive()
 
 	// Create a router
 	s.router = mux.NewRouter().StrictSlash(true)
@@ -60,48 +67,45 @@ func (s *Server) run() {
 
 	// Create an HTTP server
 	s.http = &http.Server{
-		Addr: fmt.Sprintf(":%d", s.PortNo)
-		Handler: s.router
+		Addr:    fmt.Sprintf(":%d", s.PortNo),
+		Handler: s.router,
 	}
 
 	// Set the LED
-	s.led := gopitools.Led{GpioLed: 18, TurnOffOnClose: true}
-	if err := s.led.On(); err != nil {
+	s.Led = gopitools.Led{GpioLed: 18}
+	if err := s.Led.On(); err != nil {
 		s.logError("Failed to switch on the LED.", err.Error())
 	}
-	defer s.Led.Close()
 
-	go func() {
-		
-	}()
+	// Set the display
+	s.LCD = &Display{ShowTime: 5}
+	s.LCD.SetItem("IP", "No IP", "")
+	s.LCD.SetItem("TEMP", "Temp", "")
+	s.LCD.SetItem("LIGHT", "Light", "")
+	s.LCD.SetItem("MOISTURE", "Moisture", "")
+	s.LCD.Start()
 
-	// Start the scheduler
-	go func() {
-		// Create the soil monitor object
-		s.monitor = SoilMonitor{
-			VerboseLogging: s.VerboseLogging,
-			Srv: s,
-		}
-
-		//
-		s.finder = gopifinder.Finder{VerboseLog: s.VerboseLogging}
-
-		// Read the values immedietely
-		s.monitor.Run()
-
-		// Start the scheduler
-		cw := clockwerk.New()
-		cw.Every(time.Duration(s.SchedTime) * time.Minute).Do(s.monitor)
-		cw.Start()
-	}()
-
-	// Start the web server
 	go func() {
 		// Register service with the Finder server
 		go s.registerService()
 
+		// Read the values immedietely
+		s.Monitor.Run()
+
+		// Start the scheduler
+		s.cw = clockwerk.New()
+		s.cw.Every(time.Duration(s.SchedTime) * time.Minute).Do(&s.Monitor)
+		s.cw.Start()
+	}()
+
+	// Start the web server
+	go func() {
+		s.logInfo("Server listening on port", s.PortNo)
 		if err := s.http.ListenAndServe(); err != nil {
-			s.logError("Error starting Web Server.", err.Error())
+			msg := err.Error()
+			if !strings.Contains(msg, "http: Server closed") {
+				s.logError("Error starting Web Server.", err.Error())
+			}
 		}
 	}()
 
@@ -109,42 +113,60 @@ func (s *Server) run() {
 	_ = <-s.exit
 
 	// Turn off the LED
-	if err := s.led.Off(); err != nil {
+	if err := s.Led.Off(); err != nil {
 		s.logError("Failed to turn off the LED.", err.Error())
 	}
 
 	// Shutdown the HTTP server
 	s.http.Shutdown(nil)
+
+	s.LCD.Stop()
+
+	s.logDebug("Shutdown complete")
+	close(s.shutdown)
 }
 
 // AddController adds the specified web service controller to the Router
 func (s *Server) addController(c Controller) {
-	c.AddController(s.Router, s)
+	c.AddController(s.router, s)
 }
 
 func (s *Server) registerService() {
-	// Flash the LED
-	s.Led.Flash(250)
-
+	s.logDebug("Reg: Getting device info")
 	isReg := false
+	d, err := gopifinder.NewDeviceInfo()
+	if err != nil {
+		s.logError("Error getting device info.", err.Error())
+	}
+	s.logDebug("Reg: Creating service")
+	sv := d.CreateService("SoilMonitor")
+	sv.PortNo = s.PortNo
+
+	if sv.IPAddress == "" {
+		s.LCD.SetItem("IP", "No IP", "")
+	}
+	ipArr := strings.Split(sv.IPAddress, ".")
+	if len(ipArr) == 4 {
+		s.LCD.SetItem("IP", ipArr[0]+"."+ipArr[1]+".", ipArr[2]+"."+ipArr[3])
+	}
 
 	for !isReg {
+		s.logDebug("Reg: Finding devices")
 		_, err := s.Finder.FindDevices()
 		if err != nil {
 			s.logError("Error getting list of devices.", err.Error())
 		} else {
 			if len(s.Finder.Devices) == 0 {
+				s.logDebug("Reg: Sleeping")
 				time.Sleep(15 * time.Second)
 			} else {
 				// Register the services with the devices
-				s.Finder.RegisterServices(sl)
+				s.logDebug("Registering the service.")
+				s.Finder.RegisterServices([]gopifinder.ServiceInfo{sv})
 				isReg = true
 			}
 		}
 	}
-
-	// Set the LED to solid
-	s.Led.On()
 }
 
 // logDebug logs a debug message to the logger
