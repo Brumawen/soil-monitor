@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -33,6 +35,26 @@ type Server struct {
 // Start is called when the service is starting
 func (s *Server) Start(v service.Service) error {
 	s.logInfo("Service starting")
+
+	// Make sure the working directory is the same as the application exe
+	ap, err := os.Executable()
+	if err != nil {
+		s.logError("Error getting the executable path.", err.Error())
+	} else {
+		wd, err := os.Getwd()
+		if err != nil {
+			s.logError("Error getting current working directory.", err.Error())
+		} else {
+			ad := filepath.Dir(ap)
+			s.logInfo("Current application path is", ad)
+			if ad != wd {
+				if err := os.Chdir(ad); err != nil {
+					s.logError("Error chaning working directory.", err.Error())
+				}
+			}
+		}
+	}
+
 	// Create a channel that will be used to block until the Stop signal is received
 	s.exit = make(chan struct{})
 	go s.run()

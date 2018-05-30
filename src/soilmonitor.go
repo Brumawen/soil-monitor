@@ -91,6 +91,7 @@ func (m *SoilMonitor) MeasureValues() (Measurement, error) {
 	tmp.ID = ""
 
 	// Get the available one-wire devices
+	okToRead := true
 	m.logDebug("Getting one-wire device list.")
 	devlst, err := gopitools.GetDeviceList()
 	if err != nil {
@@ -99,10 +100,11 @@ func (m *SoilMonitor) MeasureValues() (Measurement, error) {
 		errLst = append(errLst, msg)
 	} else {
 		if len(devlst) == 0 {
-			m.Srv.LCD.SetItem("TEMP", "No Temp", "Device")
-			msg := "No temperature device found."
+			m.Srv.LCD.SetItem("TEMP", "Temp", "No Cable")
+			msg := "No temperature device found. Cable could be disconnected."
 			m.logError(msg)
 			errLst = append(errLst, msg)
+			okToRead = false
 		} else {
 			m.logDebug("Reading temperature from ", devlst[0].Name)
 			tmp.ID = devlst[0].ID
@@ -119,22 +121,27 @@ func (m *SoilMonitor) MeasureValues() (Measurement, error) {
 		}
 	}
 
-	// Read ambient light and moisture content
-	m.logDebug("Reading Light and Moisture values")
-	mcp := gopitools.Mcp3008{}
-	defer mcp.Close()
-	mcpVals, err := mcp.Read()
-	if err != nil {
-		m.Srv.LCD.SetItem("LIGHT", "Light", "Err")
-		m.Srv.LCD.SetItem("MOISTURE", "Moisture", "Err")
-		msg := "Error reading MCP3008 values. " + err.Error() + "."
-		m.logError(msg)
-		errLst = append(errLst, msg)
+	if okToRead {
+		// Read ambient light and moisture content
+		m.logDebug("Reading Light and Moisture values")
+		mcp := gopitools.Mcp3008{}
+		defer mcp.Close()
+		mcpVals, err := mcp.Read()
+		if err != nil {
+			m.Srv.LCD.SetItem("LIGHT", "Light", "Err")
+			m.Srv.LCD.SetItem("MOISTURE", "Moisture", "Err")
+			msg := "Error reading MCP3008 values. " + err.Error() + "."
+			m.logError(msg)
+			errLst = append(errLst, msg)
+		} else {
+			v.Light = 100 - mcpVals[0]
+			m.Srv.LCD.SetItem("LIGHT", "Light", fmt.Sprintf("%f", v.Light))
+			v.Moisture = mcpVals[1]
+			m.Srv.LCD.SetItem("MOISTURE", "Moisture", fmt.Sprintf("%f", v.Moisture))
+		}
 	} else {
-		v.Light = 100 - mcpVals[0]
-		m.Srv.LCD.SetItem("LIGHT", "Light", fmt.Sprintf("%f", v.Light))
-		v.Moisture = mcpVals[1]
-		m.Srv.LCD.SetItem("MOISTURE", "Moisture", fmt.Sprintf("%f", v.Moisture))
+		m.Srv.LCD.SetItem("LIGHT", "Light", "No Cable")
+		m.Srv.LCD.SetItem("MOISTURE", "Moisture", "No Cable")
 	}
 
 	// Switch off the power to the soil components
