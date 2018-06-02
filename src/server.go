@@ -30,6 +30,7 @@ type Server struct {
 	http           *http.Server         // HTTP server
 	router         *mux.Router          // HTTP router
 	cw             *clockwerk.Clockwerk // Clockwerk scheduler
+	isregistering  bool                 // Indicates that a registration is currently ongoing
 }
 
 // Start is called when the service is starting
@@ -118,7 +119,7 @@ func (s *Server) run() {
 
 	go func() {
 		// Register service with the Finder server
-		go s.registerService()
+		go s.RegisterService()
 
 		// Read the values immedietely
 		s.Monitor.Run()
@@ -173,42 +174,53 @@ func (s *Server) addController(c Controller) {
 	c.AddController(s.router, s)
 }
 
-func (s *Server) registerService() {
-	s.logDebug("Reg: Getting device info")
+// RegisterService will register the service with the devices on the network
+func (s *Server) RegisterService() {
+	if s.isregistering {
+		return
+	}
+	s.isregistering = true
 	isReg := false
-	d, err := gopifinder.NewDeviceInfo()
-	if err != nil {
-		s.logError("Error getting device info.", err.Error())
-	}
-	s.logDebug("Reg: Creating service")
-	sv := d.CreateService("SoilMonitor")
-	sv.PortNo = s.PortNo
-
-	if sv.IPAddress == "" {
-		s.LCD.SetItem("IP", "No IP", "")
-	}
-	ipArr := strings.Split(sv.IPAddress, ".")
-	if len(ipArr) == 4 {
-		s.LCD.SetItem("IP", ipArr[0]+"."+ipArr[1]+".", ipArr[2]+"."+ipArr[3])
-	}
-
+	s.logDebug("Starting service registration.")
 	for !isReg {
-		s.logDebug("Reg: Finding devices")
-		_, err := s.Finder.FindDevices()
+		s.logDebug("RegisterService: Getting device info")
+		d, err := gopifinder.NewDeviceInfo()
 		if err != nil {
-			s.logError("Error getting list of devices.", err.Error())
+			s.logError("Error getting device info.", err.Error())
+		}
+		s.logDebug("RegisterService: Creating service")
+		sv := d.CreateService("SoilMonitor")
+		sv.PortNo = s.PortNo
+
+		if sv.IPAddress == "" {
+			s.logDebug("RegisterService: No IP address found.")
+			s.LCD.SetItem("IP", "No IP", "")
+		} else {
+			s.logDebug("RegisterService: Using IP address", sv.IPAddress)
+			ipArr := strings.Split(sv.IPAddress, ".")
+			if len(ipArr) == 4 {
+				s.LCD.SetItem("IP", ipArr[0]+"."+ipArr[1]+".", ipArr[2]+"."+ipArr[3])
+			}
+		}
+
+		s.logDebug("Reg: Finding devices")
+		_, err = s.Finder.FindDevices()
+		if err != nil {
+			s.logError("RegisterService: Error getting list of devices.", err.Error())
 		} else {
 			if len(s.Finder.Devices) == 0 {
-				s.logDebug("Reg: Sleeping")
+				s.logDebug("RegisterService: Sleeping")
 				time.Sleep(15 * time.Second)
 			} else {
 				// Register the services with the devices
-				s.logDebug("Registering the service.")
+				s.logDebug("RegisterService: Registering the service.")
 				s.Finder.RegisterServices([]gopifinder.ServiceInfo{sv})
 				isReg = true
 			}
 		}
 	}
+	s.logDebug("Completed service registration.")
+	s.isregistering = false
 }
 
 // logDebug logs a debug message to the logger

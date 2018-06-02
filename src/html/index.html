@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+
+    <link rel="stylesheet" href="assets/css/uikit.min.css" />
+    <script src="assets/js/uikit.min.js"></script>
+    <script src="assets/js/uikit-icons.min.js"></script>
+    <script src="assets/js/jquery-3.3.1.min.js"></script>
+</head>
+<body class="uk-height-1-1">
+    <label class="uk-label">Hello</label>
+    <button onclick="setIframe()">click me</button>
+    <iframe id="myIframe" >
+
+    </iframe>
+
+    <script type="text/javascript">
+        function setIframe() {
+            $('#myIframe').prop('src', '/config.html')
+        }
+    </script>
+</body>
+</html>

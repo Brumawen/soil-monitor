@@ -22,6 +22,9 @@ type SoilMonitor struct {
 // and send the measurements to Thingspeak
 // It will also keep the last hour's worth of measurements in a list.
 func (m *SoilMonitor) Run() {
+	// Rerun a registration
+	go m.Srv.RegisterService()
+
 	m.logDebug("Starting measurement run.")
 	// Get the current measurements
 	v, err := m.MeasureValues()
