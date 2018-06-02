@@ -23,14 +23,14 @@ func (c *LogController) AddController(router *mux.Router, s *Server) {
 }
 
 func (c *LogController) handleGetLogs(w http.ResponseWriter, r *http.Request) {
-	if myInfo, err := gopifinder.NewDeviceInfo(); err != nil {
+	myInfo, err := gopifinder.NewDeviceInfo()
+	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
-	} else {
-		if myInfo.OS != "Linux" {
-			http.Error(w, "Not supported.", 500)
-			return
-		}
+	}
+	if myInfo.OS != "Linux" {
+		http.Error(w, "Not supported.", 500)
+		return
 	}
 	out, _ := exec.Command("journalctl", "--no-pager", "-u", "SoilMonitor", "-S", "1 hour ago").CombinedOutput()
 	w.Write([]byte(out))

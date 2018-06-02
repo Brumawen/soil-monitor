@@ -4,7 +4,10 @@
 *.dll
 *.so
 *.dylib
+
 ts-api-key
+clientid
+config.json
 
 # Test binary, build with `go test -c`
 *.test

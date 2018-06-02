@@ -20,7 +20,7 @@ type Server struct {
 	PortNo         int                  // Port No the server will listen on
 	VerboseLogging bool                 // Verbose logging on/ off
 	Timeout        int                  // Timeout waiting for a response from an IP probe.  Defaults to 2 seconds.
-	SchedTime      int                  // Schedule time (mins)
+	Config         *Config              // Configuration settings
 	Finder         gopifinder.Finder    // Finder client - used to find other devices
 	Monitor        SoilMonitor          // Soil monitor module
 	LCD            *Display             // LCD display
@@ -81,12 +81,20 @@ func (s *Server) run() {
 	s.Finder.Logger = logger
 	s.Finder.VerboseLogging = service.Interactive()
 
+	// Get the configuration
+	if s.Config == nil {
+		s.Config = &Config{}
+	}
+	s.Config.ReadFromFile("config.json")
+
 	// Create a router
 	s.router = mux.NewRouter().StrictSlash(true)
+	s.router.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.Dir("./html/assets"))))
 
 	// Add the controllers
 	s.addController(new(MeasureController))
 	s.addController(new(LogController))
+	s.addController(new(ConfigController))
 
 	// Create an HTTP server
 	s.http = &http.Server{
@@ -116,9 +124,7 @@ func (s *Server) run() {
 		s.Monitor.Run()
 
 		// Start the scheduler
-		s.cw = clockwerk.New()
-		s.cw.Every(time.Duration(s.SchedTime) * time.Minute).Do(&s.Monitor)
-		s.cw.Start()
+		s.StartSchedule()
 	}()
 
 	// Start the web server
@@ -147,6 +153,19 @@ func (s *Server) run() {
 
 	s.logDebug("Shutdown complete")
 	close(s.shutdown)
+}
+
+// StartSchedule will start up the schedule for measuring the values
+func (s *Server) StartSchedule() {
+	if s.Config.Period <= 0 {
+		s.Config.Period = 5
+	}
+	if s.cw != nil {
+		s.cw.Stop()
+	}
+	s.cw = clockwerk.New()
+	s.cw.Every(time.Duration(s.Config.Period) * time.Minute).Do(&s.Monitor)
+	s.cw.Start()
 }
 
 // AddController adds the specified web service controller to the Router

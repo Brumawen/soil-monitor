@@ -14,15 +14,13 @@ var logger service.Logger
 func main() {
 	port := flag.Int("p", 20510, "Port Number to listen on.")
 	timeout := flag.Int("t", 2, "Timeout in seconds to wait for a response from a IP probe.")
-	mins := flag.Int("m", 5, "Number of minutes between measurements.")
 	svcFlag := flag.String("service", "", "Service action.  Valid actions are: 'start', 'stop', 'restart', 'instal' and 'uninstall'")
 	flag.Parse()
 
 	// Create a new server
 	s := &Server{
-		PortNo:    *port,
-		Timeout:   *timeout,
-		SchedTime: *mins,
+		PortNo:  *port,
+		Timeout: *timeout,
 	}
 
 	// Create the service

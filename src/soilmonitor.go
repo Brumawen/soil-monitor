@@ -4,10 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
-
-	"github.com/brumawen/gopi-finder/src"
 
 	gopitools "github.com/brumawen/gopi-tools/src"
 )
@@ -35,12 +32,14 @@ func (m *SoilMonitor) Run() {
 			DateMeasured: time.Now(),
 		})
 	} else {
-		// Send the measurement to Thingspeak
-		m.logDebug("Sending result to Thingspeak.")
-		err = m.sendToThingspeak(v)
-		if err != nil {
-			m.logError("Error sending result to Thingspeak. " + err.Error())
-			v.Error = err.Error()
+		if m.Srv.Config.EnableThingspeak {
+			// Send the measurement to Thingspeak
+			m.logDebug("Sending result to Thingspeak.")
+			err = m.sendToThingspeak(v)
+			if err != nil {
+				m.logError("Error sending result to Thingspeak. " + err.Error())
+				v.Error = err.Error()
+			}
 		}
 		// Append the measurement to the list
 		m.Measurements = append(m.Measurements, v)
@@ -173,19 +172,14 @@ func (m *SoilMonitor) setStopped() {
 }
 
 func (m *SoilMonitor) sendToThingspeak(v Measurement) error {
-	if _, err := os.Stat("ts-api-key"); os.IsNotExist(err) {
-		// Thingspeak API key file is missing
-		return errors.New("API key file 'ts-api-key' is missing")
+	key := m.Srv.Config.ThingspeakID
+	if key == "" {
+		return errors.New("Thingspeak API ID has not been configured")
 	}
 
-	// Get the thingspeak api key
-	key, err := gopifinder.ReadAllText("ts-api-key")
-	if err != nil {
-		return errors.New("Error reading API Key from 'ts-api-key' file. " + err.Error())
-	}
 	client := http.Client{}
 	url := fmt.Sprintf("https://api.thingspeak.com/update?api_key=%s&field1=%f&field2=%f&field3=%f", key, v.Temperature, v.Light, v.Moisture)
-	_, err = client.Get(url)
+	_, err := client.Get(url)
 	if err != nil {
 		return err
 	}
