@@ -10,9 +10,13 @@ import (
 
 // Config holds the configuration required for the Soil Monitor module.
 type Config struct {
-	Period           int    `json:"period"`
-	EnableThingspeak bool   `json:"enableThingspeak"`
-	ThingspeakID     string `json:"thingspeakID"`
+	Period           int    `json:"period"`           // The update period (in minutes)
+	EnableThingspeak bool   `json:"enableThingspeak"` // Enable Thingspeak integration
+	ThingspeakID     string `json:"thingspeakID"`     // Thingspeak ID
+	EnableMqtt       bool   `json:"enableMqtt"`       // Enable MQTT integration
+	MqttHost         string `json:"mqttHost"`         // MQTT Host
+	MqttUsername     string `json:"mqttUsername"`     // MQTT Username
+	MqttPassword     string `json:"mqttPassword"`     // MQTT password
 }
 
 // ReadFromFile will read the configuration settings from the specified file

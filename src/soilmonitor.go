@@ -3,7 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
+	"os/exec"
+	"strconv"
+	"strings"
 	"time"
 
 	gopitools "github.com/brumawen/gopi-tools/src"
@@ -12,15 +16,16 @@ import (
 // SoilMonitor manages the monitoring of the soil measurement components
 // and provides the latest readings.
 type SoilMonitor struct {
-	Srv          *Server
-	LastRead     time.Time
-	Measurements []Measurement
-	IsRunning    bool
+	Srv             *Server       // Server instance
+	LastRead        time.Time     // Last time the measurement was taken
+	Measurements    []Measurement // Last 10 measurements
+	LastMeasurement Measurement   // Last successful measurement
+	IsRunning       bool          // Is the monitor running
 }
 
 // Run is called from the scheduler (ClockWerk). This function will get the latest measurements
 // and send the measurements to Thingspeak
-// It will also keep the last hour's worth of measurements in a list.
+// It will also keep the last 12 measurements in a list.
 func (m *SoilMonitor) Run() {
 	// Rerun a registration
 	go m.Srv.RegisterService()
@@ -35,6 +40,7 @@ func (m *SoilMonitor) Run() {
 			DateMeasured: time.Now(),
 		})
 	} else {
+		// Thingspeak
 		if m.Srv.Config.EnableThingspeak {
 			// Send the measurement to Thingspeak
 			m.logDebug("Sending result to Thingspeak.")
@@ -44,10 +50,21 @@ func (m *SoilMonitor) Run() {
 				v.Error = err.Error()
 			}
 		}
+		// MQTT
+		if m.Srv.Config.EnableMqtt {
+			// Send the measurement to MQTT broker
+			m.logDebug("Sending result to MQTT.")
+			err := m.Srv.MqttClient.SendTelemetry(v)
+			if err != nil {
+				m.logError("Error sending result to MQTT broker. " + err.Error())
+				v.Error = err.Error()
+			}
+		}
+
 		// Append the measurement to the list
 		m.Measurements = append(m.Measurements, v)
 	}
-	// Only keep the last 10 measurements
+	// Only keep the last 12 measurements
 	if len(m.Measurements) > 12 {
 		// Remove the first item
 		m.Measurements = m.Measurements[1:]
@@ -126,20 +143,37 @@ func (m *SoilMonitor) MeasureValues() (Measurement, error) {
 	if okToRead {
 		// Read ambient light and moisture content
 		m.logDebug("Reading Light and Moisture values")
-		mcp := gopitools.Mcp3008{}
-		defer mcp.Close()
-		mcpVals, err := mcp.Read()
+
+		out, err := exec.Command("python", "mcp3008.py").CombinedOutput()
 		if err != nil {
-			m.Srv.LCD.SetItem("LIGHT", "Light", "Err")
-			m.Srv.LCD.SetItem("MOISTURE", "Moisture", "Err")
-			msg := "Error reading MCP3008 values. " + err.Error() + "."
+			msg := "Failed to get light and moisture content values. " + err.Error() + "."
 			m.logError(msg)
 			errLst = append(errLst, msg)
+			m.Srv.LCD.SetItem("LIGHT", "Light", "Err")
+			m.Srv.LCD.SetItem("MOISTURE", "Moisture", "Err")
 		} else {
-			v.Light = 100 - mcpVals[0]
-			m.Srv.LCD.SetItem("LIGHT", "Light", fmt.Sprintf("%f", v.Light))
-			v.Moisture = mcpVals[1]
-			m.Srv.LCD.SetItem("MOISTURE", "Moisture", fmt.Sprintf("%f", v.Moisture))
+			outStr := string(out)
+			mcpVals := strings.Split(outStr, ",")
+
+			if f, err := strconv.ParseFloat(mcpVals[0], 64); err != nil {
+				msg := "Failed to get light value. " + err.Error() + "."
+				m.logError(msg)
+				errLst = append(errLst, msg)
+				m.Srv.LCD.SetItem("LIGHT", "Light", "Err")
+			} else {
+				v.Light = math.Round(((100 - (f * 100)) * 100) / 100)
+				m.Srv.LCD.SetItem("LIGHT", "Light", fmt.Sprintf("%f", v.Light))
+			}
+
+			if f, err := strconv.ParseFloat(mcpVals[1], 64); err != nil {
+				msg := "Failed to get moisture content value. " + err.Error() + "."
+				m.logError(msg)
+				errLst = append(errLst, msg)
+				m.Srv.LCD.SetItem("MOISTURE", "Moisture", "Err")
+			} else {
+				v.Moisture = math.Round((f * 100) / 100)
+				m.Srv.LCD.SetItem("MOISTURE", "Moisture", fmt.Sprintf("%f", v.Moisture))
+			}
 		}
 	} else {
 		m.Srv.LCD.SetItem("LIGHT", "Light", "No Cable")

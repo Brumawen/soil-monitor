@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/brumawen/gopi-finder/src"
-	"github.com/brumawen/gopi-tools/src"
+	gopifinder "github.com/brumawen/gopi-finder/src"
+	gopitools "github.com/brumawen/gopi-tools/src"
 	"github.com/gorilla/mux"
 	"github.com/kardianos/service"
 	"github.com/onatm/clockwerk"
@@ -23,6 +23,7 @@ type Server struct {
 	Config         *Config              // Configuration settings
 	Finder         gopifinder.Finder    // Finder client - used to find other devices
 	Monitor        SoilMonitor          // Soil monitor module
+	MqttClient     *Mqtt                // MQTT client
 	LCD            *Display             // LCD display
 	Led            gopitools.Led        // LED module
 	exit           chan struct{}        // Exit flag
@@ -117,9 +118,16 @@ func (s *Server) run() {
 	s.LCD.SetItem("MOISTURE", "Moisture", "")
 	s.LCD.Start()
 
+	if s.MqttClient == nil {
+		s.MqttClient = &Mqtt{}
+		s.MqttClient.Srv = s
+	}
+
 	go func() {
 		// Register service with the Finder server
 		go s.RegisterService()
+
+		s.MqttClient.Initialize()
 
 		// Read the values immedietely
 		s.Monitor.Run()
