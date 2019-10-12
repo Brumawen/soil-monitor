@@ -152,7 +152,8 @@ func (m *SoilMonitor) MeasureValues() (Measurement, error) {
 			m.Srv.LCD.SetItem("LIGHT", "Light", "Err")
 			m.Srv.LCD.SetItem("MOISTURE", "Moisture", "Err")
 		} else {
-			outStr := string(out)
+			outStr := strings.TrimSpace(string(out))
+			m.logDebug("Values returned =", outStr)
 			mcpVals := strings.Split(outStr, ",")
 
 			if f, err := strconv.ParseFloat(mcpVals[0], 64); err != nil {
