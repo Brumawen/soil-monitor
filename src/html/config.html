@@ -44,6 +44,60 @@
             </div>
         </fieldset>
         <fieldset class="uk-fieldset uk-margin-top">
+            <legend class="uk-legend">MQTT</legend>
+            <div class="uk-margin">
+                <label class="uk-form-label" for="enableMQTT">
+                    Send values to MQTT Server
+                </label>
+                <div class="uk-form-controls">
+                    <input class="uk-checkbox uk-form-width-large" id="enableMQTT" name="enableMQTT" type="checkbox" checked="{{.EnableMqtt}}">
+                </div>
+            </div>
+            <div class="uk-margin">
+                <label class="uk-form-label" for="mqttHost">
+                    MQTT Host Name
+                </label>
+                <div class="uk-form-controls">
+                    <input class="uk-input uk-form-width-medium" id="mqttHost" name="mqttHost" type="text" placeholder="Host Name or IP Address" value="{{.MqttHost}}">
+                </div>
+            </div>
+            <div class="uk-margin">
+                <label class="uk-form-label" for="mqttUser">
+                    Authentication User Name
+                </label>
+                <div class="uk-form-controls">
+                    <input class="uk-input uk-form-width-medium" id="mqttUser" name="mqttUser" type="text" placeholder="User Name" value="{{.MqttUsername}}">
+                </div>
+            </div>
+            <div class="uk-margin">
+                <label class="uk-form-label" for="mqttPword">
+                    Authentication Password
+                </label>
+                <div class="uk-form-controls">
+                    <input class="uk-input uk-form-width-medium" id="mqttPword" name="mqttPword" type="text" placeholder="User Name" value="{{.MqttPassword}}">
+                </div>
+            </div>
+        </fieldset>
+        <fieldset class="uk-fieldset uk-margin-top">
+            <legend class="uk-legend">Temperature Sensors</legend>
+            <div class="uk-margin">
+                <label class="uk-form-label" for="airTempID">
+                    Air Temperature ID
+                </label>
+                <div class="uk-form-controls">
+                    <input class="uk-input uk-form-width-medium" id="airTempID" name="airTempID" type="text" placeholder="Thingspeak ID" value="{{.AirTempID}}">
+                </div>
+            </div>
+            <div class="uk-margin">
+                <label class="uk-form-label" for="soilTempID">
+                    Soil Temperature ID
+                </label>
+                <div class="uk-form-controls">
+                    <input class="uk-input uk-form-width-medium" id="soilTempID" name="soilTempID" type="text" placeholder="Thingspeak ID" value="{{.SoilTempID}}">
+                </div>
+            </div>
+        </fieldset>
+        <fieldset class="uk-fieldset uk-margin-top">
             <input class="uk-button uk-button-primary" type="submit" value="Save Changes">
         </fieldset>
     </form>
