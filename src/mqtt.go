@@ -83,13 +83,20 @@ func (m *Mqtt) SendTelemetry(v Measurement) error {
 	m.LastUpdateAttempt = time.Now()
 
 	// Temperature
+	m.logInfo("Publishing air temperature - ", fmt.Sprintf("%f", v.AirTemp))
+	token := m.client.Publish("home/garden/airtemp", byte(0), true, fmt.Sprintf("%.1f", v.AirTemp))
+	if token.Wait() && token.Error() != nil {
+		m.logError("Error sending air temperature state to MQTT Broker.", token.Error())
+		return token.Error()
+	}
 
 	m.logInfo("Publishing soil temperature - ", fmt.Sprintf("%f", v.SoilTemp))
 	token := m.client.Publish("home/garden/soiltemp", byte(0), true, fmt.Sprintf("%.1f", v.SoilTemp))
 	if token.Wait() && token.Error() != nil {
-		m.logError("Error sending temperature state to MQTT Broker.", token.Error())
+		m.logError("Error sending soil temperature state to MQTT Broker.", token.Error())
 		return token.Error()
 	}
+
 	// Light
 	m.logInfo("Publishing light - ", fmt.Sprintf("%f", v.Light))
 	token = m.client.Publish("home/garden/light", byte(0), true, fmt.Sprintf("%.1f", v.Light))
