@@ -120,11 +120,11 @@ func (m *Mqtt) SendTelemetry(v Measurement) error {
 // logInfo logs an information message to the logger
 func (m *Mqtt) logInfo(v ...interface{}) {
 	a := fmt.Sprint(v...)
-	logger.Info("Mqtt: [Inf] ", a[1:len(a)-1])
+	logger.Info("Mqtt: [Inf] ", a)
 }
 
 // logError logs an error message to the logger
 func (m *Mqtt) logError(v ...interface{}) {
 	a := fmt.Sprint(v...)
-	logger.Error("Mqtt [Err] ", a[1:len(a)-1])
+	logger.Error("Mqtt [Err] ", a)
 }

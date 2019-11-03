@@ -79,11 +79,11 @@ func (c *ConfigController) handleSetConfig(w http.ResponseWriter, r *http.Reques
 // LogInfo is used to log information messages for this controller.
 func (c *ConfigController) LogInfo(v ...interface{}) {
 	a := fmt.Sprint(v...)
-	logger.Info("ConfigController: ", a[1:len(a)-1])
+	logger.Info("ConfigController: ", a)
 }
 
 // LogError is used to log error messages for this controller.
 func (c *ConfigController) LogError(v ...interface{}) {
 	a := fmt.Sprint(v...)
-	logger.Error("ConfigController: ", a[1:len(a)-1])
+	logger.Error("ConfigController: ", a)
 }

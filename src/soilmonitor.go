@@ -238,16 +238,16 @@ func (m *SoilMonitor) sendToThingspeak(v Measurement) error {
 func (m *SoilMonitor) logDebug(v ...interface{}) {
 	if m.Srv.VerboseLogging {
 		a := fmt.Sprint(v...)
-		logger.Info("SoilMonitor: ", a[1:len(a)-1])
+		logger.Info("SoilMonitor: ", a)
 	}
 }
 
 func (m *SoilMonitor) logInfo(v ...interface{}) {
 	a := fmt.Sprint(v...)
-	logger.Info("SoilMonitor: ", a[1:len(a)-1])
+	logger.Info("SoilMonitor: ", a)
 }
 
 func (m *SoilMonitor) logError(v ...interface{}) {
 	a := fmt.Sprint(v...)
-	logger.Error("SoilMonitor: ", a[1:len(a)-1])
+	logger.Error("SoilMonitor: ", a)
 }
