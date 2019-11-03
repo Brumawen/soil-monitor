@@ -104,81 +104,92 @@ func (m *SoilMonitor) MeasureValues() (Measurement, error) {
 
 	errLst := []string{}
 
-	// Get the temperature probe
-	tmp := gopitools.OneWireTemp{}
-	defer tmp.Close()
-	tmp.ID = ""
-
 	// Get the available one-wire devices
-	okToRead := true
 	m.logDebug("Getting one-wire device list.")
 	devlst, err := gopitools.GetDeviceList()
 	if err != nil {
 		msg := "Error getting one-wire device list. " + err.Error() + "."
 		m.logError(msg)
 		errLst = append(errLst, msg)
+	}
+
+	// Read the Air Temperature
+	airTemp := gopitools.OneWireTemp{}
+	defer airTemp.Close()
+	airTemp.ID = m.Srv.Config.AirTempID
+	if !airTemp.IsInDevices(devlst) {
+		m.Srv.LCD.SetItem("AIRTEMP", "AirTemp", "No Cable")
+		msg := "No air temperature device '" + airTemp.ID + "' found. Cable could be disconnected."
+		m.logError(msg)
 	} else {
-		if len(devlst) == 0 {
-			m.Srv.LCD.SetItem("TEMP", "Temp", "No Cable")
-			msg := "No temperature device found. Cable could be disconnected."
+		m.logDebug("Reading air temperature from ", airTemp.ID)
+		temp, err := airTemp.ReadTemp()
+		if err != nil {
+			m.Srv.LCD.SetItem("AIRTEMP", "AirTemp", "Err")
+			msg := "Error reading air temperature. " + err.Error() + "."
 			m.logError(msg)
 			errLst = append(errLst, msg)
-			okToRead = false
 		} else {
-			m.logDebug("Reading temperature from ", devlst[0].Name)
-			tmp.ID = devlst[0].ID
-			temp, err := tmp.ReadTemp()
-			if err != nil {
-				m.Srv.LCD.SetItem("TEMP", "Temp", "Err")
-				msg := "Error reading temperature. " + err.Error() + "."
-				m.logError(msg)
-				errLst = append(errLst, msg)
-			} else {
-				m.Srv.LCD.SetItem("TEMP", "Temp", fmt.Sprintf("%f", temp))
-				v.Temperature = temp
-			}
+			m.Srv.LCD.SetItem("AIRTEMP", "AirTemp", fmt.Sprintf("%f", temp))
+			v.AirTemp = temp
 		}
 	}
 
-	if okToRead {
-		// Read ambient light and moisture content
-		m.logDebug("Reading Light and Moisture values")
-
-		out, err := exec.Command("python", "mcp3008.py").CombinedOutput()
+	// Read the soil temperature
+	soilTemp := gopitools.OneWireTemp{}
+	defer soilTemp.Close()
+	soilTemp.ID = m.Srv.Config.SoilTempID
+	if !airTemp.IsInDevices(devlst) {
+		m.Srv.LCD.SetItem("SOILTEMP", "SoilTemp", "No Cable")
+		msg := "No soil temperature device '" + airTemp.ID + "' found. Cable could be disconnected."
+		m.logError(msg)
+	} else {
+		m.logDebug("Reading soil temperature from ", airTemp.ID)
+		temp, err := soilTemp.ReadTemp()
 		if err != nil {
-			msg := "Failed to get light and moisture content values. " + err.Error() + "."
+			m.Srv.LCD.SetItem("SOILTEMP", "SoilTemp", "Err")
+			msg := "Error reading soil temperature. " + err.Error() + "."
+			m.logError(msg)
+			errLst = append(errLst, msg)
+		} else {
+			m.Srv.LCD.SetItem("SOILTEMP", "SoilTemp", fmt.Sprintf("%f", temp))
+			v.SoilTemp = temp
+		}
+	}
+
+	// Read ambient light and moisture content
+	m.logDebug("Reading Light and Moisture values")
+	out, err := exec.Command("python", "mcp3008.py").CombinedOutput()
+	if err != nil {
+		msg := "Failed to get light and moisture content values. " + err.Error() + "."
+		m.logError(msg)
+		errLst = append(errLst, msg)
+		m.Srv.LCD.SetItem("LIGHT", "Light", "Err")
+		m.Srv.LCD.SetItem("MOISTURE", "Moisture", "Err")
+	} else {
+		outStr := strings.TrimSpace(string(out))
+		m.logDebug("Values returned =", outStr)
+		mcpVals := strings.Split(outStr, ",")
+
+		if f, err := strconv.ParseFloat(mcpVals[0], 64); err != nil {
+			msg := "Failed to get light value. " + err.Error() + "."
 			m.logError(msg)
 			errLst = append(errLst, msg)
 			m.Srv.LCD.SetItem("LIGHT", "Light", "Err")
+		} else {
+			v.Light = math.Round(((100 - (f * 100)) * 100) / 100)
+			m.Srv.LCD.SetItem("LIGHT", "Light", fmt.Sprintf("%f", v.Light))
+		}
+
+		if f, err := strconv.ParseFloat(mcpVals[1], 64); err != nil {
+			msg := "Failed to get moisture content value. " + err.Error() + "."
+			m.logError(msg)
+			errLst = append(errLst, msg)
 			m.Srv.LCD.SetItem("MOISTURE", "Moisture", "Err")
 		} else {
-			outStr := strings.TrimSpace(string(out))
-			m.logDebug("Values returned =", outStr)
-			mcpVals := strings.Split(outStr, ",")
-
-			if f, err := strconv.ParseFloat(mcpVals[0], 64); err != nil {
-				msg := "Failed to get light value. " + err.Error() + "."
-				m.logError(msg)
-				errLst = append(errLst, msg)
-				m.Srv.LCD.SetItem("LIGHT", "Light", "Err")
-			} else {
-				v.Light = math.Round(((100 - (f * 100)) * 100) / 100)
-				m.Srv.LCD.SetItem("LIGHT", "Light", fmt.Sprintf("%f", v.Light))
-			}
-
-			if f, err := strconv.ParseFloat(mcpVals[1], 64); err != nil {
-				msg := "Failed to get moisture content value. " + err.Error() + "."
-				m.logError(msg)
-				errLst = append(errLst, msg)
-				m.Srv.LCD.SetItem("MOISTURE", "Moisture", "Err")
-			} else {
-				v.Moisture = math.Round((f * 100) / 100)
-				m.Srv.LCD.SetItem("MOISTURE", "Moisture", fmt.Sprintf("%f", v.Moisture))
-			}
+			v.Moisture = math.Round((f * 100) / 100)
+			m.Srv.LCD.SetItem("MOISTURE", "Moisture", fmt.Sprintf("%f", v.Moisture))
 		}
-	} else {
-		m.Srv.LCD.SetItem("LIGHT", "Light", "No Cable")
-		m.Srv.LCD.SetItem("MOISTURE", "Moisture", "No Cable")
 	}
 
 	// Switch off the power to the soil components
@@ -216,7 +227,7 @@ func (m *SoilMonitor) sendToThingspeak(v Measurement) error {
 	}
 
 	client := http.Client{}
-	url := fmt.Sprintf("https://api.thingspeak.com/update?api_key=%s&field1=%f&field2=%f&field3=%f", key, v.Temperature, v.Light, v.Moisture)
+	url := fmt.Sprintf("https://api.thingspeak.com/update?api_key=%s&field1=%f&field2=%f&field3=%f", key, v.SoilTemp, v.Light, v.Moisture)
 	_, err := client.Get(url)
 	if err != nil {
 		return err
@@ -226,17 +237,17 @@ func (m *SoilMonitor) sendToThingspeak(v Measurement) error {
 
 func (m *SoilMonitor) logDebug(v ...interface{}) {
 	if m.Srv.VerboseLogging {
-		a := fmt.Sprint(v)
+		a := fmt.Sprint(v...)
 		logger.Info("SoilMonitor: ", a[1:len(a)-1])
 	}
 }
 
 func (m *SoilMonitor) logInfo(v ...interface{}) {
-	a := fmt.Sprint(v)
+	a := fmt.Sprint(v...)
 	logger.Info("SoilMonitor: ", a[1:len(a)-1])
 }
 
 func (m *SoilMonitor) logError(v ...interface{}) {
-	a := fmt.Sprint(v)
+	a := fmt.Sprint(v...)
 	logger.Error("SoilMonitor: ", a[1:len(a)-1])
 }

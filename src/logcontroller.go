@@ -5,8 +5,7 @@ import (
 	"net/http"
 	"os/exec"
 
-	"github.com/brumawen/gopi-finder/src"
-
+	gopifinder "github.com/brumawen/gopi-finder/src"
 	"github.com/gorilla/mux"
 )
 
@@ -38,6 +37,6 @@ func (c *LogController) handleGetLogs(w http.ResponseWriter, r *http.Request) {
 
 // LogInfo is used to log information messages for this controller.
 func (c *LogController) LogInfo(v ...interface{}) {
-	a := fmt.Sprint(v)
+	a := fmt.Sprint(v...)
 	logger.Info("LogController: ", a[1:len(a)-1])
 }

@@ -99,6 +99,6 @@ func (i *DisplayItem) GetMessage() string {
 
 // logError logs an error message to the logger
 func (d *Display) logError(v ...interface{}) {
-	a := fmt.Sprint(v)
+	a := fmt.Sprint(v...)
 	logger.Error("Display: ", a[1:len(a)-1])
 }

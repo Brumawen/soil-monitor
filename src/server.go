@@ -113,7 +113,8 @@ func (s *Server) run() {
 	// Set the display
 	s.LCD = &Display{ShowTime: 5}
 	s.LCD.SetItem("IP", "No IP", "")
-	s.LCD.SetItem("TEMP", "Temp", "")
+	s.LCD.SetItem("AIRTEMP", "AirTemp", "")
+	s.LCD.SetItem("SOILTEMP", "SoilTemp", "")
 	s.LCD.SetItem("LIGHT", "Light", "")
 	s.LCD.SetItem("MOISTURE", "Moisture", "")
 	s.LCD.Start()
@@ -234,19 +235,19 @@ func (s *Server) RegisterService() {
 // logDebug logs a debug message to the logger
 func (s *Server) logDebug(v ...interface{}) {
 	if s.VerboseLogging {
-		a := fmt.Sprint(v)
+		a := fmt.Sprint(v...)
 		logger.Info("Server: ", a[1:len(a)-1])
 	}
 }
 
 // logInfo logs an information message to the logger
 func (s *Server) logInfo(v ...interface{}) {
-	a := fmt.Sprint(v)
+	a := fmt.Sprint(v...)
 	logger.Info("Server: ", a[1:len(a)-1])
 }
 
 // logError logs an error message to the logger
 func (s *Server) logError(v ...interface{}) {
-	a := fmt.Sprint(v)
+	a := fmt.Sprint(v...)
 	logger.Error("Server: ", a[1:len(a)-1])
 }

@@ -43,6 +43,6 @@ func (c *MeasureController) handleGetCurrent(w http.ResponseWriter, r *http.Requ
 
 // LogInfo is used to log information messages for this controller.
 func (c *MeasureController) LogInfo(v ...interface{}) {
-	a := fmt.Sprint(v)
+	a := fmt.Sprint(v...)
 	logger.Info("MeasureController: ", a[1:len(a)-1])
 }

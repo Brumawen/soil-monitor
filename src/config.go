@@ -17,6 +17,8 @@ type Config struct {
 	MqttHost         string `json:"mqttHost"`         // MQTT Host
 	MqttUsername     string `json:"mqttUsername"`     // MQTT Username
 	MqttPassword     string `json:"mqttPassword"`     // MQTT password
+	AirTempID        string `json:"airTempId"`        // ID of the Air temperature sensor
+	SoilTempID       string `json:"soilTempId"`       // ID of the Soil temperature sensor
 }
 
 // ReadFromFile will read the configuration settings from the specified file

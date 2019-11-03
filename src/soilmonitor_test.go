@@ -10,7 +10,10 @@ func TestCanMeasureValues(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if v.Temperature == 0 {
-		t.Error("Temperature is 0.")
+	if v.SoilTemp == 0 {
+		t.Error("Soil temperature is 0.")
+	}
+	if v.AirTemp == 0 {
+		t.Error("Air temperature is 0")
 	}
 }

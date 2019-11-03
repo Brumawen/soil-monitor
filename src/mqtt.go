@@ -17,6 +17,7 @@ type Mqtt struct {
 
 }
 
+// Initialize starts up the MQTT client
 func (m *Mqtt) Initialize() error {
 	if !m.Srv.Config.EnableMqtt {
 		m.logInfo("MQTT has been disabled")
@@ -83,8 +84,8 @@ func (m *Mqtt) SendTelemetry(v Measurement) error {
 
 	// Temperature
 
-	m.logInfo("Publishing temperature - ", fmt.Sprintf("%f", v.Temperature))
-	token := m.client.Publish("home/garden/soiltemp", byte(0), true, fmt.Sprintf("%.1f", v.Temperature))
+	m.logInfo("Publishing soil temperature - ", fmt.Sprintf("%f", v.SoilTemp))
+	token := m.client.Publish("home/garden/soiltemp", byte(0), true, fmt.Sprintf("%.1f", v.SoilTemp))
 	if token.Wait() && token.Error() != nil {
 		m.logError("Error sending temperature state to MQTT Broker.", token.Error())
 		return token.Error()
@@ -111,12 +112,12 @@ func (m *Mqtt) SendTelemetry(v Measurement) error {
 
 // logInfo logs an information message to the logger
 func (m *Mqtt) logInfo(v ...interface{}) {
-	a := fmt.Sprint(v)
+	a := fmt.Sprint(v...)
 	logger.Info("Mqtt: [Inf] ", a[1:len(a)-1])
 }
 
 // logError logs an error message to the logger
 func (m *Mqtt) logError(v ...interface{}) {
-	a := fmt.Sprint(v)
+	a := fmt.Sprint(v...)
 	logger.Error("Mqtt [Err] ", a[1:len(a)-1])
 }

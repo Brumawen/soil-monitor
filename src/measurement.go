@@ -10,7 +10,8 @@ import (
 
 // Measurement holds the values read from the component probes.
 type Measurement struct {
-	Temperature  float64
+	AirTemp      float64
+	SoilTemp     float64
 	Light        float64
 	Moisture     float64
 	Success      bool
