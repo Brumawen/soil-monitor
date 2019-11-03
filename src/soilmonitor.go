@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"os/exec"
 	"strconv"
@@ -177,7 +176,7 @@ func (m *SoilMonitor) MeasureValues() (Measurement, error) {
 			errLst = append(errLst, msg)
 			m.Srv.LCD.SetItem("LIGHT", "Light", "Err")
 		} else {
-			v.Light = math.Round(((100 - (f * 100)) * 100) / 100)
+			v.Light = 100 - (f * 100)
 			m.Srv.LCD.SetItem("LIGHT", "Light", fmt.Sprintf("%f", v.Light))
 		}
 
@@ -187,7 +186,7 @@ func (m *SoilMonitor) MeasureValues() (Measurement, error) {
 			errLst = append(errLst, msg)
 			m.Srv.LCD.SetItem("MOISTURE", "Moisture", "Err")
 		} else {
-			v.Moisture = math.Round((f * 100) / 100)
+			v.Moisture = f * 100
 			m.Srv.LCD.SetItem("MOISTURE", "Moisture", fmt.Sprintf("%f", v.Moisture))
 		}
 	}
@@ -227,7 +226,7 @@ func (m *SoilMonitor) sendToThingspeak(v Measurement) error {
 	}
 
 	client := http.Client{}
-	url := fmt.Sprintf("https://api.thingspeak.com/update?api_key=%s&field1=%f&field2=%f&field3=%f", key, v.SoilTemp, v.Light, v.Moisture)
+	url := fmt.Sprintf("https://api.thingspeak.com/update?api_key=%s&field1=%.1f&field2=%.1f&field3=%.1f", key, v.SoilTemp, v.Light, v.Moisture)
 	_, err := client.Get(url)
 	if err != nil {
 		return err

@@ -98,14 +98,14 @@ func (m *Mqtt) SendTelemetry(v Measurement) error {
 	}
 
 	// Light
-	m.logInfo("Publishing light - ", fmt.Sprintf("%f", v.Light))
+	m.logInfo("Publishing light - ", fmt.Sprintf("%.1f", v.Light))
 	token = m.client.Publish("home/garden/light", byte(0), true, fmt.Sprintf("%.1f", v.Light))
 	if token.Wait() && token.Error() != nil {
 		m.logError("Error sending light state to MQTT Broker.", token.Error())
 		return token.Error()
 	}
 	// Moisture
-	m.logInfo("Publishing moisture - ", fmt.Sprintf("%f", v.Moisture))
+	m.logInfo("Publishing moisture - ", fmt.Sprintf("%.1f", v.Moisture))
 	token = m.client.Publish("home/garden/moisture", byte(0), true, fmt.Sprintf("%.1f", v.Moisture))
 	if token.Wait() && token.Error() != nil {
 		m.logError("Error sending moisture state to MQTT Broker.", token.Error())
