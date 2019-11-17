@@ -82,6 +82,14 @@ func (m *Mqtt) SendTelemetry(v Measurement) error {
 	m.logInfo("Publishing telemetry to MQTT")
 	m.LastUpdateAttempt = time.Now()
 
+	if !m.client.IsConnected() {
+		m.logInfo("Reconnecting to MQTT broker")
+		if token := m.client.Connect(); token.Wait() && token.Error() != nil {
+			m.logError("Error connecting to MQTT Broker.", token.Error())
+			return token.Error()
+		}
+	}
+
 	// Temperature
 	m.logInfo("Publishing air temperature - ", fmt.Sprintf("%.1f", v.AirTemp), "C")
 	token := m.client.Publish("home/garden/airtemp", byte(0), true, fmt.Sprintf("%.1f", v.AirTemp))
