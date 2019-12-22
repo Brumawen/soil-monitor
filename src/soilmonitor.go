@@ -129,8 +129,15 @@ func (m *SoilMonitor) MeasureValues() (Measurement, error) {
 			m.logError(msg)
 			errLst = append(errLst, msg)
 		} else {
-			m.Srv.LCD.SetItem("AIRTEMP", "AirTemp", fmt.Sprintf("%f", temp))
-			v.AirTemp = temp
+			if temp == 999999 {
+				m.Srv.LCD.SetItem("AIRTEMP", "AirTemp", "Err")
+				msg := "Error reading air temperature."
+				m.logError(msg)
+				errLst = append(errLst, msg)
+			} else {
+				m.Srv.LCD.SetItem("AIRTEMP", "AirTemp", fmt.Sprintf("%f", temp))
+				v.AirTemp = temp
+			}
 		}
 	}
 
@@ -151,8 +158,15 @@ func (m *SoilMonitor) MeasureValues() (Measurement, error) {
 			m.logError(msg)
 			errLst = append(errLst, msg)
 		} else {
-			m.Srv.LCD.SetItem("SOILTEMP", "SoilTemp", fmt.Sprintf("%f", temp))
-			v.SoilTemp = temp
+			if temp == 999999 {
+				m.Srv.LCD.SetItem("SOILTEMP", "SoilTemp", "Err")
+				msg := "Error reading soil temperature."
+				m.logError(msg)
+				errLst = append(errLst, msg)
+			} else {
+				m.Srv.LCD.SetItem("SOILTEMP", "SoilTemp", fmt.Sprintf("%f", temp))
+				v.SoilTemp = temp
+			}
 		}
 	}
 
